@@ -28,7 +28,62 @@ let directVPSMode = false;
 const getBaseUrl = () => directVPSMode ? VPS_DIRECT_URL : CLOUDFLARE_URL;
 const getModeLabel = () => directVPSMode ? '🔴 DIRECT VPS (No Cloudflare)' : '🟢 Via Cloudflare';
 
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(BOT_TOKEN, {
+  polling: {
+    interval: 1000,
+    autoStart: true,
+    params: { timeout: 30 }
+  }
+});
+
+// ==================== CRASH PROTECTION ====================
+// Prevent crashes from unhandled errors
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ Uncaught Exception (not crashing):', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ Unhandled Rejection (not crashing):', reason?.message || reason);
+});
+
+// Telegram bot error handlers with auto-reconnect
+bot.on('polling_error', (err) => {
+  const msg = err?.message || '';
+  console.error(`⚠️ Polling error: ${msg}`);
+
+  // If 409 conflict, another instance is running - retry after delay
+  if (msg.includes('409')) {
+    console.log('🔄 409 Conflict detected, retrying in 10s...');
+    bot.stopPolling();
+    setTimeout(() => {
+      bot.startPolling().catch(() => { });
+    }, 10000);
+  }
+  // If EFATAL or network error, reconnect after delay
+  if (msg.includes('EFATAL') || msg.includes('ECONNRESET') || msg.includes('ETIMEDOUT') || msg.includes('ENOTFOUND')) {
+    console.log('🔄 Network error, reconnecting in 5s...');
+    bot.stopPolling();
+    setTimeout(() => {
+      bot.startPolling().catch(() => { });
+    }, 5000);
+  }
+});
+
+bot.on('error', (err) => {
+  console.error('⚠️ Bot error (not crashing):', err?.message || err);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  bot.stopPolling();
+  process.exit(0);
+});
+process.on('SIGTERM', () => {
+  console.log('\n🛑 SIGTERM received, shutting down...');
+  bot.stopPolling();
+  process.exit(0);
+});
 
 // Load discovered endpoints
 const endpointsPath = join(__dirname, 'discovered-endpoints.json');

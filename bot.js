@@ -258,7 +258,7 @@ async function runUserJourney(engine, duration, concurrency, progressCb) {
 
   const progressInterval = setInterval(() => {
     if (progressCb && engine.running) progressCb(engine.getStats());
-  }, 8000);
+  }, 3000);
 
   await Promise.all(workers);
   engine.running = false;
@@ -325,7 +325,7 @@ async function runAuthJourney(engine, duration, concurrency, progressCb) {
 
   const progressInterval = setInterval(() => {
     if (progressCb && engine.running) progressCb(engine.getStats());
-  }, 8000);
+  }, 3000);
 
   await Promise.all(workers);
   engine.running = false;
@@ -445,7 +445,7 @@ async function runConcurrent(engine, endpoints, concurrency, duration, progressC
 
   const progressInterval = setInterval(() => {
     if (progressCb && engine.running) progressCb(engine.getStats());
-  }, 8000);
+  }, 3000);
 
   await Promise.all(workers);
   engine.running = false;
@@ -492,11 +492,12 @@ async function runRamping(engine, endpoints, stages, progressCb) {
 // ==================== THROTTLE CONFIG ====================
 // Server rate limit: 500 req/min. Smart throttle adds delay between requests.
 // Set to 0 to disable throttling (full speed, will hit rate limit).
-let THROTTLE_DELAY_MS = 120; // ~8 req/s = 480/min (just under 500 limit)
+let THROTTLE_DELAY_MS = 0; // 0 = FULL SPEED, toggle from bot menu if needed
 const BYPASS_HEADER = process.env.STRESS_BYPASS_KEY || ''; // Set if VPS has bypass header
 
 // ==================== TEST DEFINITIONS ====================
 const activeTests = new Map();
+const lastTestResults = new Map(); // Store test results for JSON report
 
 const TEST_CATALOG = {
   quick: { emoji: '\u26A1', name: 'Quick Smoke', desc: '50 VUs x 30s', defaultVus: 50, defaultDuration: 30000 },
@@ -684,6 +685,8 @@ async function runTest(testId, chatId, msgId, customVus = null) {
 
   // Show final report
   const stats = engine.getStats();
+  // Save stats for JSON report retrieval
+  lastTestResults.set(testId, { ...stats, completedAt: now(), target: getBaseUrl(), vus: customVus || catalog.defaultVus });
   let extra = '';
   if (testId === 'cache') {
     const hitRatio = stats.total > 0 ? ((stats.success / stats.total) * 100).toFixed(1) : 0;
@@ -781,7 +784,7 @@ async function runFullTest(chatId, msgId) {
 
   const fullResults = {
     startedAt: now(),
-    target: BASE_URL,
+    target: getBaseUrl(),
     systemInfo: getSystemInfo(),
     testCount: tests.length,
     tests: {},
@@ -1068,13 +1071,38 @@ bot.on('callback_query', async (query) => {
   // ---- JSON REPORT ----
   if (data.startsWith('json_')) {
     const testId = data.replace('json_', '');
-    // Re-run would be needed for stored results, but we'll use last engine stats
     await bot.answerCallbackQuery(query.id, { text: 'Generating JSON...' }).catch(() => { });
-    // Quick response
-    const report = { test: testId, exportedAt: now(), note: 'Use Full Test for comprehensive JSON' };
+    const savedStats = lastTestResults.get(testId);
+    const report = savedStats ? {
+      test: testId,
+      catalog: TEST_CATALOG[testId] || {},
+      exportedAt: now(),
+      target: savedStats.target || getBaseUrl(),
+      systemInfo: getSystemInfo(),
+      results: {
+        total: savedStats.total,
+        success: savedStats.success,
+        failed: savedStats.failed,
+        errorRate: savedStats.errorRate + '%',
+        rps: savedStats.rps,
+        duration: savedStats.elapsed,
+        vus: savedStats.vus,
+        completedAt: savedStats.completedAt,
+      },
+      latency: {
+        avg: savedStats.avgLatency + 'ms',
+        p50: savedStats.p50 + 'ms',
+        p95: savedStats.p95 + 'ms',
+        p99: savedStats.p99 + 'ms',
+        min: savedStats.minLatency + 'ms',
+        max: savedStats.maxLatency + 'ms',
+      },
+      statusCodes: savedStats.statusCodes,
+      topErrors: savedStats.topErrors,
+    } : { test: testId, exportedAt: now(), error: 'No stored results — run this test first' };
     const filepath = join(resultsDir, `${testId}-${Date.now()}.json`);
     writeFileSync(filepath, JSON.stringify(report, null, 2));
-    await bot.sendDocument(chatId, filepath, { caption: `📋 ${testId} report` });
+    await bot.sendDocument(chatId, filepath, { caption: `📋 ${testId} report — ${savedStats ? savedStats.total + ' requests | ' + savedStats.errorRate + '% errors' : 'no data'}` });
     return;
   }
 

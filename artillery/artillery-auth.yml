@@ -1,0 +1,35 @@
+config:
+  target: "https://dracinshort.xyz"
+  phases:
+    - duration: 60
+      arrivalRate: 100
+      name: "Auth stress"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  - name: "Login attempts"
+    weight: 60
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            username: "stress_user_{{ $randomNumber(1,9999) }}"
+            password: "StressTest123!"
+      - think: 0.1
+
+  - name: "Register + Check username"
+    weight: 20
+    flow:
+      - get:
+          url: "/api/auth/check-username?username=stress_{{ $randomNumber(1,99999) }}"
+      - think: 0.5
+
+  - name: "VIP Plans fetch"
+    weight: 20
+    flow:
+      - get:
+          url: "/api/vip/plans"
+      - get:
+          url: "/api/referral/settings"

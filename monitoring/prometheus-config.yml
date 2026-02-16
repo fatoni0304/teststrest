@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "dracin-gateway"
+    static_configs:
+      - targets: ["host.docker.internal:5000"]
+    metrics_path: "/api/metrics"
+    scrape_interval: 10s
+
+  - job_name: "dracin-auth"
+    static_configs:
+      - targets: ["host.docker.internal:3100"]
+    metrics_path: "/health"
+    scrape_interval: 10s
+
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: "redis-exporter"
+    static_configs:
+      - targets: ["redis-exporter:9121"]

@@ -1,0 +1,16 @@
+{
+    "name": "dracin-stress-test",
+    "version": "1.0.0",
+    "description": "Enterprise-grade stress testing suite for DRACIN streaming platform - Telegram Bot controlled",
+    "type": "module",
+    "main": "bot.js",
+    "scripts": {
+        "start": "node bot.js",
+        "bot": "node bot.js"
+    },
+    "dependencies": {
+        "node-telegram-bot-api": "^0.66.0",
+        "axios": "^1.7.0",
+        "systeminformation": "^5.22.0"
+    }
+}

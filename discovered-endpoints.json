@@ -1,0 +1,225 @@
+{
+  "project": "DracinShort",
+  "scannedAt": "2026-02-16T18:54:00+07:00",
+  "baseUrl": "https://dracinshort.xyz",
+  "gatewayPort": 5000,
+  "authPort": 3100,
+  "rateLimit": {
+    "windowMs": 60000,
+    "maxRequests": 500,
+    "localhostBypass": true
+  },
+  "database": {
+    "type": "PostgreSQL",
+    "auth": "Argon2id",
+    "orm": "Raw SQL (pg Pool)"
+  },
+  "cache": {
+    "type": "Redis",
+    "warmup": true,
+    "abuseProtection": true,
+    "failsafeMode": true
+  },
+  "services": {
+    "gateway": {
+      "base": "/api",
+      "endpoints": {
+        "meta": [
+          { "method": "GET", "path": "/api", "desc": "API Documentation", "auth": false },
+          { "method": "GET", "path": "/api/health", "desc": "Health Check All Services", "auth": false },
+          { "method": "GET", "path": "/health", "desc": "Simple Health Check", "auth": false },
+          { "method": "GET", "path": "/api/metrics", "desc": "Server Metrics", "auth": false }
+        ],
+        "dramabox": [
+          { "method": "GET", "path": "/api/dramabox/vip", "desc": "VIP content", "auth": false },
+          { "method": "GET", "path": "/api/dramabox/trending", "desc": "Trending dramas", "auth": false },
+          { "method": "GET", "path": "/api/dramabox/latest", "desc": "Latest dramas", "auth": false, "params": "page=1" },
+          { "method": "GET", "path": "/api/dramabox/search", "desc": "Search", "auth": false, "params": "query=love" },
+          { "method": "GET", "path": "/api/dramabox/detail", "desc": "Drama detail", "auth": false, "params": "bookId=xxx" },
+          { "method": "GET", "path": "/api/dramabox/allepisode", "desc": "All episodes", "auth": false, "params": "bookId=xxx" },
+          { "method": "GET", "path": "/api/dramabox/allstreams", "desc": "All streams", "auth": false, "params": "bookId=xxx" },
+          { "method": "GET", "path": "/api/dramabox/stream", "desc": "Stream episode", "auth": false, "params": "bookId=xxx&episode=1" }
+        ],
+        "netshort": [
+          { "method": "GET", "path": "/api/netshort/theaters", "desc": "Theaters list", "auth": false },
+          { "method": "GET", "path": "/api/netshort/foryou", "desc": "For You", "auth": false, "params": "page=1" },
+          { "method": "GET", "path": "/api/netshort/search", "desc": "Search", "auth": false, "params": "query=love" },
+          { "method": "GET", "path": "/api/netshort/allepisode", "desc": "All episodes", "auth": false, "params": "shortPlayId=xxx" },
+          { "method": "GET", "path": "/api/netshort/allstreams", "desc": "All streams", "auth": false, "params": "shortPlayId=xxx" },
+          { "method": "GET", "path": "/api/netshort/stream", "desc": "Stream episode", "auth": false, "params": "shortPlayId=xxx&episode=1" }
+        ],
+        "reelshort": [
+          { "method": "GET", "path": "/api/reelshort/homepage", "desc": "Homepage", "auth": false },
+          { "method": "GET", "path": "/api/reelshort/trending", "desc": "Trending", "auth": false },
+          { "method": "GET", "path": "/api/reelshort/latest", "desc": "Latest", "auth": false },
+          { "method": "GET", "path": "/api/reelshort/search", "desc": "Search", "auth": false, "params": "query=love&page=1" },
+          { "method": "GET", "path": "/api/reelshort/detail", "desc": "Detail", "auth": false, "params": "bookId=xxx" },
+          { "method": "GET", "path": "/api/reelshort/allepisode", "desc": "All episodes", "auth": false, "params": "bookId=xxx" },
+          { "method": "GET", "path": "/api/reelshort/allstreams", "desc": "All streams", "auth": false, "params": "bookId=xxx" },
+          { "method": "GET", "path": "/api/reelshort/stream", "desc": "Stream episode", "auth": false, "params": "bookId=xxx&episode=1" }
+        ],
+        "dramawave": [
+          { "method": "GET", "path": "/api/dramawave/home", "desc": "Homepage", "auth": false },
+          { "method": "GET", "path": "/api/dramawave/recommend", "desc": "Recommendations", "auth": false },
+          { "method": "GET", "path": "/api/dramawave/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/dramawave/detail", "desc": "Detail", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/dramawave/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/dramawave/stream", "desc": "Stream (HLS + Subtitles)", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "melolo": [
+          { "method": "GET", "path": "/api/melolo/theaters", "desc": "Theaters", "auth": false },
+          { "method": "GET", "path": "/api/melolo/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/melolo/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/melolo/stream", "desc": "Stream", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "bilitv": [
+          { "method": "GET", "path": "/api/bilitv/theaters", "desc": "Theaters", "auth": false },
+          { "method": "GET", "path": "/api/bilitv/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/bilitv/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/bilitv/stream", "desc": "Stream", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "dotdrama": [
+          { "method": "GET", "path": "/api/dotdrama/theaters", "desc": "Theaters", "auth": false },
+          { "method": "GET", "path": "/api/dotdrama/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/dotdrama/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/dotdrama/stream", "desc": "Stream", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "flickreels": [
+          { "method": "GET", "path": "/api/flickreels/theaters", "desc": "Theaters", "auth": false },
+          { "method": "GET", "path": "/api/flickreels/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/flickreels/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/flickreels/stream", "desc": "Stream", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "goodshort": [
+          { "method": "GET", "path": "/api/goodshort/theaters", "desc": "Theaters", "auth": false },
+          { "method": "GET", "path": "/api/goodshort/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/goodshort/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/goodshort/stream", "desc": "Stream", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "idrama": [
+          { "method": "GET", "path": "/api/idrama/theaters", "desc": "Theaters", "auth": false },
+          { "method": "GET", "path": "/api/idrama/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/idrama/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/idrama/stream", "desc": "Stream", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "shortmax": [
+          { "method": "GET", "path": "/api/shortmax/theaters", "desc": "Theaters", "auth": false },
+          { "method": "GET", "path": "/api/shortmax/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/shortmax/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/shortmax/stream", "desc": "Stream", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "velolo": [
+          { "method": "GET", "path": "/api/velolo/theaters", "desc": "Theaters", "auth": false },
+          { "method": "GET", "path": "/api/velolo/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/velolo/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/velolo/stream", "desc": "Stream", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "stardusttv": [
+          { "method": "GET", "path": "/api/stardusttv/theaters", "desc": "Theaters", "auth": false },
+          { "method": "GET", "path": "/api/stardusttv/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/stardusttv/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/stardusttv/stream", "desc": "Stream", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "vigloo": [
+          { "method": "GET", "path": "/api/vigloo/theaters", "desc": "Theaters", "auth": false },
+          { "method": "GET", "path": "/api/vigloo/search", "desc": "Search", "auth": false, "params": "q=love" },
+          { "method": "GET", "path": "/api/vigloo/allstreams", "desc": "All streams", "auth": false, "params": "id=xxx" },
+          { "method": "GET", "path": "/api/vigloo/stream", "desc": "Stream (CF Worker)", "auth": false, "params": "id=xxx&episode=1" }
+        ],
+        "unified": [
+          { "method": "GET", "path": "/api/unified/*", "desc": "Unified Multi-Supplier Proxy", "auth": false }
+        ],
+        "serving": [
+          { "method": "GET", "path": "/api/v1/*", "desc": "Normalized Frontend Serving API", "auth": false }
+        ],
+        "settings": [
+          { "method": "GET", "path": "/api/settings/*", "desc": "Public Settings (ads, etc.)", "auth": false }
+        ]
+      }
+    },
+    "auth": {
+      "base": "/api/auth",
+      "endpoints": [
+        { "method": "POST", "path": "/api/auth/register", "desc": "Register (username+password)", "auth": false },
+        { "method": "POST", "path": "/api/auth/login", "desc": "Login (username+password)", "auth": false },
+        { "method": "POST", "path": "/api/auth/refresh", "desc": "Refresh token", "auth": false },
+        { "method": "POST", "path": "/api/auth/logout", "desc": "Logout", "auth": true },
+        { "method": "POST", "path": "/api/auth/logout-all", "desc": "Logout all devices", "auth": true },
+        { "method": "DELETE", "path": "/api/auth/sessions/:id", "desc": "Revoke session", "auth": true },
+        { "method": "GET", "path": "/api/auth/me", "desc": "Get current user", "auth": true },
+        { "method": "GET", "path": "/api/auth/check-username", "desc": "Check username availability", "auth": false },
+        { "method": "PUT", "path": "/api/auth/profile", "desc": "Update profile", "auth": true },
+        { "method": "POST", "path": "/api/auth/firebase/google", "desc": "Google Sign-In via Firebase", "auth": false },
+        { "method": "POST", "path": "/api/auth/firebase/email-login", "desc": "Firebase Email Login", "auth": false }
+      ]
+    },
+    "vip": {
+      "base": "/api/vip",
+      "endpoints": [
+        { "method": "GET", "path": "/api/vip/plans", "desc": "Get VIP plans", "auth": false },
+        { "method": "POST", "path": "/api/vip/subscribe", "desc": "Subscribe to VIP", "auth": true },
+        { "method": "GET", "path": "/api/vip/payment/:orderId", "desc": "Check payment status", "auth": true },
+        { "method": "POST", "path": "/api/vip/cancel/:orderId", "desc": "Cancel payment", "auth": true },
+        { "method": "GET", "path": "/api/vip/history", "desc": "Subscription history", "auth": true },
+        { "method": "GET", "path": "/api/vip/status", "desc": "VIP status check", "auth": true }
+      ]
+    },
+    "referral": {
+      "base": "/api/referral",
+      "endpoints": [
+        { "method": "GET", "path": "/api/referral/settings", "desc": "Referral settings (public)", "auth": false },
+        { "method": "GET", "path": "/api/referral/lookup/:code", "desc": "Lookup referral code", "auth": false },
+        { "method": "GET", "path": "/api/referral/me", "desc": "User referral stats", "auth": true },
+        { "method": "GET", "path": "/api/referral/my-referrer", "desc": "Get referrer info", "auth": true },
+        { "method": "POST", "path": "/api/referral/withdraw", "desc": "Request withdrawal", "auth": true }
+      ]
+    },
+    "history": {
+      "base": "/api/history",
+      "endpoints": [
+        { "method": "POST", "path": "/api/history/progress", "desc": "Update watch progress", "auth": true },
+        { "method": "GET", "path": "/api/history", "desc": "Get watch history", "auth": true },
+        { "method": "GET", "path": "/api/history/continue", "desc": "Continue watching", "auth": true },
+        { "method": "GET", "path": "/api/history/progress/:contentId", "desc": "Get progress", "auth": true },
+        { "method": "GET", "path": "/api/history/content/:contentId", "desc": "Content progress", "auth": true },
+        { "method": "GET", "path": "/api/history/stats", "desc": "Watch statistics", "auth": true },
+        { "method": "DELETE", "path": "/api/history", "desc": "Delete all history", "auth": true },
+        { "method": "DELETE", "path": "/api/history/:id", "desc": "Delete history entry", "auth": true }
+      ]
+    },
+    "popup_trial": {
+      "base": "/api",
+      "endpoints": [
+        { "method": "GET", "path": "/api/popups/*", "desc": "Popup management", "auth": false },
+        { "method": "GET", "path": "/api/trial/*", "desc": "Trial management", "auth": false }
+      ]
+    },
+    "admin": {
+      "base": "/api/admin",
+      "note": "Admin routes restricted to admin subdomain. Require authMiddleware.",
+      "endpoints": [
+        { "method": "GET", "path": "/api/admin/ads", "desc": "Get ad settings", "auth": true },
+        { "method": "PUT", "path": "/api/admin/ads", "desc": "Update ad settings", "auth": true },
+        { "method": "GET", "path": "/api/admin/pricing", "desc": "Get pricing settings", "auth": true },
+        { "method": "PUT", "path": "/api/admin/pricing", "desc": "Update pricing settings", "auth": true },
+        { "method": "GET", "path": "/api/admin/content-lock", "desc": "Get content lock settings", "auth": true },
+        { "method": "PUT", "path": "/api/admin/content-lock", "desc": "Update content lock settings", "auth": true },
+        { "method": "GET", "path": "/api/admin/users/*", "desc": "User management (proxy to auth-v2)", "auth": true },
+        { "method": "GET", "path": "/api/admin/popups/*", "desc": "Popup admin", "auth": true },
+        { "method": "GET", "path": "/api/admin/trial/*", "desc": "Trial admin", "auth": true },
+        { "method": "GET", "path": "/api/admin/referral/*", "desc": "Referral admin", "auth": true },
+        { "method": "GET", "path": "/api/admin/database/*", "desc": "Database management", "auth": true },
+        { "method": "GET", "path": "/api/admin/*", "desc": "General admin routes", "auth": true }
+      ]
+    }
+  },
+  "middleware": {
+    "rateLimiter": "500 req/min per IP, localhost bypass",
+    "securityHeaders": "XSS, CSP protection",
+    "sanitizer": "Input sanitization",
+    "identityHider": "Hide supplier identity",
+    "bruteForce": "Brute force protection on login/register",
+    "cacheControl": "API no-cache headers"
+  },
+  "totalEndpoints": 142
+}

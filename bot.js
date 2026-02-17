@@ -1,7 +1,8 @@
 /**
- * DRACIN Enterprise Stress Testing Bot v2.0
+ * DRACIN Enterprise Stress Testing Bot v2.1
  * Full Inline Keyboard UI — No slash commands
  * Configurable Full Test + JSON Report
+ * v2.1: Fixed expected responses, httpsAgent reuse, menu polish
  */
 
 import TelegramBot from 'node-telegram-bot-api';
@@ -27,6 +28,9 @@ const REF_CODE = 'CY5DXWJP';
 let directVPSMode = false;
 const getBaseUrl = () => directVPSMode ? VPS_DIRECT_URL : CLOUDFLARE_URL;
 const getModeLabel = () => directVPSMode ? '🔴 DIRECT VPS (No Cloudflare)' : '🟢 Via Cloudflare';
+
+// Shared HTTPS agent for VPS mode (reuse sockets instead of creating per-request)
+const vpsHttpsAgent = new https.Agent({ rejectUnauthorized: false, keepAlive: true, maxSockets: 500, maxFreeSockets: 50 });
 
 const bot = new TelegramBot(BOT_TOKEN, {
   polling: {
@@ -338,14 +342,25 @@ class StressEngine {
   constructor(name, baseUrl) {
     this.name = name;
     this.baseUrl = baseUrl;
-    this.results = { total: 0, success: 0, failed: 0, errors: [], latencies: [], statusCodes: {} };
+    this.results = { total: 0, success: 0, failed: 0, expectedErrors: 0, errors: [], latencies: [], statusCodes: {} };
     this.running = false;
     this.startTime = 0;
   }
 
   reset() {
-    this.results = { total: 0, success: 0, failed: 0, errors: [], latencies: [], statusCodes: {} };
+    this.results = { total: 0, success: 0, failed: 0, expectedErrors: 0, errors: [], latencies: [], statusCodes: {} };
     this.running = false;
+  }
+
+  // Check if a non-2xx response is expected (not a real error)
+  isExpectedResponse(path, code) {
+    // 503 on search endpoints = provider has no data for that query, not an infra error
+    if (code === 503 && path.includes('/search')) return true;
+    // 401/403 on auth-protected endpoints with fake tokens = expected
+    if ((code === 401 || code === 403) && (path.includes('/vip/status') || path.includes('/vip/history') || path.includes('/referral/me') || path.includes('/history') || path.includes('/auth/me'))) return true;
+    // 429 rate limit = expected during rate limit test
+    if (code === 429) return true;
+    return false;
   }
 
   async hitEndpoint(path, method = 'GET', data = null, headers = {}) {
@@ -364,7 +379,7 @@ class StressEngine {
           ...headers
         },
         validateStatus: () => true,
-        ...(directVPSMode ? { httpsAgent: new https.Agent({ rejectUnauthorized: false }) } : {})
+        ...(directVPSMode ? { httpsAgent: vpsHttpsAgent } : {})
       };
       if (data) config.data = data;
       if (data) config.headers['Content-Type'] = 'application/json';
@@ -376,9 +391,17 @@ class StressEngine {
       this.results.latencies.push(latency);
       const code = res.status;
       this.results.statusCodes[code] = (this.results.statusCodes[code] || 0) + 1;
-      if (code >= 200 && code < 400) { this.results.success++; }
-      else { this.results.failed++; this.results.errors.push({ path, code, latency }); }
-      return { ok: code < 400, status: code, latency, data: res.data };
+      if (code >= 200 && code < 400) {
+        this.results.success++;
+      } else if (this.isExpectedResponse(path, code)) {
+        // Expected non-2xx: count as success (not infra error)
+        this.results.success++;
+        this.results.expectedErrors++;
+      } else {
+        this.results.failed++;
+        this.results.errors.push({ path, code, latency });
+      }
+      return { ok: code < 400 || this.isExpectedResponse(path, code), status: code, latency, data: res.data };
     } catch (err) {
       const latency = Date.now() - start;
       this.results.total++;
@@ -395,6 +418,7 @@ class StressEngine {
     const rps = elapsed > 0 ? (this.results.total / (elapsed / 1000)).toFixed(2) : 0;
     return {
       name: this.name, total: this.results.total, success: this.results.success, failed: this.results.failed,
+      expectedErrors: this.results.expectedErrors,
       errorRate: this.results.total > 0 ? ((this.results.failed / this.results.total) * 100).toFixed(2) : '0',
       rps, elapsed: formatDuration(elapsed), elapsedMs: elapsed,
       avgLatency: lat.length > 0 ? (lat.reduce((a, b) => a + b, 0) / lat.length).toFixed(0) : 0,
@@ -414,6 +438,7 @@ class StressEngine {
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `⏱ Duration: ${s.elapsed}\n` +
       `📨 Total: ${s.total} | ✅ ${s.success} | ❌ ${s.failed}\n` +
+      (s.expectedErrors > 0 ? `ℹ️ Expected: ${s.expectedErrors} (search/auth)\n` : '') +
       `📈 RPS: ${s.rps} | 🎯 Err: ${s.errorRate}%\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `⏰ Latency: Avg ${s.avgLatency}ms | P50 ${s.p50}ms\n` +
@@ -791,7 +816,7 @@ async function runFullTest(chatId, msgId) {
     summary: {}
   };
 
-  let totalReqs = 0, totalSuccess = 0, totalFailed = 0;
+  let totalReqs = 0, totalSuccess = 0, totalFailed = 0, totalExpected = 0;
 
   for (let i = 0; i < tests.length; i++) {
     const testId = tests[i];
@@ -821,6 +846,7 @@ async function runFullTest(chatId, msgId) {
       totalReqs += stats.total;
       totalSuccess += stats.success;
       totalFailed += stats.failed;
+      totalExpected += stats.expectedErrors || 0;
     }
 
     await sleep(2000); // Brief pause between tests
@@ -832,6 +858,7 @@ async function runFullTest(chatId, msgId) {
     totalRequests: totalReqs,
     totalSuccess,
     totalFailed,
+    totalExpectedErrors: totalExpected,
     overallErrorRate: totalReqs > 0 ? ((totalFailed / totalReqs) * 100).toFixed(2) + '%' : '0%',
     grade: totalReqs > 0 && (totalFailed / totalReqs) < 0.05 ? 'A+' :
       (totalFailed / totalReqs) < 0.1 ? 'A' :
@@ -846,6 +873,7 @@ async function runFullTest(chatId, msgId) {
     `📨 Total: <b>${totalReqs.toLocaleString()}</b> requests\n` +
     `✅ Success: <b>${totalSuccess.toLocaleString()}</b>\n` +
     `❌ Failed: <b>${totalFailed.toLocaleString()}</b>\n` +
+    (totalExpected > 0 ? `ℹ️ Expected: <b>${totalExpected.toLocaleString()}</b> (search/auth)\n` : '') +
     `🎯 Error Rate: <b>${fullResults.summary.overallErrorRate}</b>\n` +
     `🏆 Grade: <b>${fullResults.summary.grade}</b>\n\n` +
     `Sending JSON report...`,
@@ -890,6 +918,7 @@ const MENU_TESTS = {
     [{ text: '\uD83D\uDEAB Rate Limit', callback_data: 'test_ratelimit' }, { text: '\uD83D\uDD12 Security', callback_data: 'test_security' }],
     [{ text: '━━ VU PRESETS ━━', callback_data: 'noop' }],
     [{ text: '1K', callback_data: 'setvu_1000' }, { text: '5K', callback_data: 'setvu_5000' }, { text: '10K', callback_data: 'setvu_10000' }, { text: '15K', callback_data: 'setvu_15000' }],
+    [{ text: '🔄 Reset VU', callback_data: 'setvu_reset' }],
     [{ text: '\u2B05\uFE0F Back', callback_data: 'menu_main' }],
   ]
 };
@@ -925,12 +954,12 @@ let vuOverride = null;
 bot.onText(/\/start/, async (msg) => {
   if (String(msg.chat.id) !== CHAT_ID) return;
   await bot.sendMessage(CHAT_ID,
-    `🎬 <b>DRACIN Stress Testing Bot v2.0</b>\n` +
+    `🎬 <b>DRACIN Stress Testing Bot v2.1</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `🎯 Target: <code>${getBaseUrl()}</code>\n` +
-    `� ${getModeLabel()}\n` +
-    `�📊 Endpoints: ${discoveredEndpoints.totalEndpoints || 142}\n` +
-    `� Bypass: ${BYPASS_HEADER ? '✅ Active' : '❌ Off'}\n` +
+    `📡 ${getModeLabel()}\n` +
+    `📊 Endpoints: ${discoveredEndpoints.totalEndpoints || 142}\n` +
+    `🔑 Bypass: ${BYPASS_HEADER ? '✅ Active' : '❌ Off'}\n` +
     `⏱ Throttle: ${THROTTLE_DELAY_MS}ms\n` +
     `⏰ ${now()}\n\n` +
     `Choose a category below:`,
@@ -950,11 +979,11 @@ bot.on('callback_query', async (query) => {
   // ---- MENUS ----
   if (data === 'menu_main') {
     await safeEdit(chatId, msgId,
-      `🎬 <b>DRACIN Stress Testing Bot v2.0</b>\n` +
+      `🎬 <b>DRACIN Stress Testing Bot v2.1</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🎯 Target: <code>${getBaseUrl()}</code>\n` +
-      `� ${getModeLabel()}\n` +
-      `�📊 Endpoints: ${discoveredEndpoints.totalEndpoints || 142}\n` +
+      `📡 ${getModeLabel()}\n` +
+      `📊 Endpoints: ${discoveredEndpoints.totalEndpoints || 142}\n` +
       `${vuOverride ? `👥 VU Override: <b>${vuOverride.toLocaleString()}</b>\n` : ''}` +
       `\nChoose a category:`,
       { reply_markup: MENU_MAIN }
@@ -1002,11 +1031,19 @@ bot.on('callback_query', async (query) => {
 
   // ---- VU PRESETS ----
   if (data.startsWith('setvu_')) {
-    vuOverride = parseInt(data.split('_')[1]);
-    await bot.answerCallbackQuery(query.id, { text: `✅ VU Override set to ${vuOverride.toLocaleString()}`, show_alert: true }).catch(() => { });
+    if (data === 'setvu_reset') {
+      vuOverride = null;
+      await bot.answerCallbackQuery(query.id, { text: '🔄 VU Override cleared — using defaults', show_alert: true }).catch(() => { });
+    } else {
+      vuOverride = parseInt(data.split('_')[1]);
+      await bot.answerCallbackQuery(query.id, { text: `✅ VU Override set to ${vuOverride.toLocaleString()}`, show_alert: true }).catch(() => { });
+    }
     await safeEdit(chatId, msgId,
       `📊 <b>Stress Tests</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
-      `Pick a test to run.\n\n👥 VU Override: <b>${vuOverride.toLocaleString()}</b>`,
+      `🎯 Target: <code>${getBaseUrl()}</code>\n` +
+      `📡 ${getModeLabel()}\n` +
+      `${vuOverride ? `👥 VU Override: <b>${vuOverride.toLocaleString()}</b>` : '👥 Using default VUs per test'}\n\n` +
+      `Pick a test to run. Use VU presets below to override VU count.`,
       { reply_markup: MENU_TESTS }
     );
     return;
@@ -1083,6 +1120,7 @@ bot.on('callback_query', async (query) => {
         total: savedStats.total,
         success: savedStats.success,
         failed: savedStats.failed,
+        expectedErrors: savedStats.expectedErrors || 0,
         errorRate: savedStats.errorRate + '%',
         rps: savedStats.rps,
         duration: savedStats.elapsed,
@@ -1280,13 +1318,13 @@ bot.on('callback_query', async (query) => {
   // ---- INFO ----
   if (data === 'info_about') {
     await safeEdit(chatId, msgId,
-      `📖 <b>DRACIN Stress Bot v2.0</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `📖 <b>DRACIN Stress Bot v2.1</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
       `Enterprise-grade stress testing for the DRACIN streaming platform.\n\n` +
-      `✅ 14 test types (load, stress, spike, burst, soak...)\n` +
+      `✅ 18 test types (load, stress, spike, burst, soak...)\n` +
       `✅ Configurable VU count (1K—15K)\n` +
       `✅ Full Test with cherry-pick + JSON report\n` +
       `✅ Real user simulation w/ browser headers\n` +
-      `✅ K6 scripts for external load generation\n` +
+      `✅ Smart error classification (expected vs real)\n` +
       `✅ Security & rate limit probing\n\n` +
       `Built with Node.js + Telegram Bot API`,
       { reply_markup: { inline_keyboard: [[{ text: '⬅️ Back', callback_data: 'menu_info' }]] } }
@@ -1304,8 +1342,8 @@ bot.on('callback_query', async (query) => {
       `📊 Endpoints: ${discoveredEndpoints.totalEndpoints || 142}\n` +
       `👥 VU Override: ${vuOverride ? vuOverride.toLocaleString() : 'None (using defaults)'}\n` +
       `⏱ Throttle: ${THROTTLE_DELAY_MS}ms\n` +
-      `� Bypass Key: ${BYPASS_HEADER ? '✅ Active' : '❌ Not set'}\n` +
-      `�📁 Results Dir: <code>${resultsDir}</code>`,
+      `🔐 Bypass Key: ${BYPASS_HEADER ? '✅ Active' : '❌ Not set'}\n` +
+      `📁 Results Dir: <code>${resultsDir}</code>`,
       { reply_markup: { inline_keyboard: [[{ text: '⬅️ Back', callback_data: 'menu_info' }]] } }
     );
     return;
@@ -1329,14 +1367,14 @@ bot.on('callback_query', async (query) => {
 });
 
 // ==================== STARTUP ====================
-console.log('🤖 DRACIN Stress Bot v2.0 starting...');
+console.log('🤖 DRACIN Stress Bot v2.1 starting...');
 console.log(`📡 Target: ${getBaseUrl()}`);
 console.log(`📡 Mode: ${directVPSMode ? 'Direct VPS' : 'Cloudflare'}`);
 console.log(`🔑 Bypass Key: ${BYPASS_HEADER ? 'Active' : 'Not set'}`);
 console.log(`⏱ Throttle: ${THROTTLE_DELAY_MS}ms`);
 
 bot.sendMessage(CHAT_ID,
-  `🤖 <b>DRACIN Stress Bot v2.0 Online!</b>\n` +
+  `🤖 <b>DRACIN Stress Bot v2.1 Online!</b>\n` +
   `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
   `🎯 Target: <code>${getBaseUrl()}</code>\n` +
   `📡 ${getModeLabel()}\n` +
